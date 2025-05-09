@@ -48,20 +48,44 @@ def warp_image_with_flow_numpy_only(img, flow, next_img):
 
     H, W = flow.shape[:2]
     warped = np.zeros_like(img)
-    for y in range(20):
-        for x in range(20):
-            warped[y, x, :] = [255, 255, 255]
-    for y in range(H):
-        for x in range(W):
-            y = H-y-1
-            x = W-x-1
-            flow_x, flow_y = flow[y, x]
-            new_x = x + flow_x 
-            new_y = y + flow_y
+    one_threading = False
 
-            if new_x > 0 and new_x < W and new_y > 0 and new_y < H:
-                warped[new_y, new_x, :] = img[y, x, :]
-                # warped[y, x, :] = next_img[new_y, new_x, :]
+    import time
+    t1 = time.time()
+
+    if one_threading:
+        for y in range(H):
+            for x in range(W):
+                y = H-y-1
+                x = W-x-1
+                flow_x, flow_y = flow[y, x]
+                new_x = x + flow_x 
+                new_y = y + flow_y
+
+                if new_x > 0 and new_x < W and new_y > 0 and new_y < H:
+                    warped[new_y, new_x, :] = img[y, x, :]
+                    # warped[y, x, :] = next_img[new_y, new_x, :]
+    else:
+
+        # Create meshgrid of pixel coordinates
+        x, y = np.meshgrid(np.arange(W), np.arange(H))
+        
+        # Compute destination coordinates
+        new_x = np.round(x + flow[..., 0]).astype(np.int32)
+        new_y = np.round(y + flow[..., 1]).astype(np.int32)
+
+        # Create valid mask
+        valid = (0 <= new_x) & (new_x < W) & (0 <= new_y) & (new_y < H)
+
+        # Get flattened indices
+        src_yx = np.stack([y[valid], x[valid]], axis=1)
+        dst_yx = np.stack([new_y[valid], new_x[valid]], axis=1)
+
+        # Assign values — note: if overlaps happen, later pixels overwrite earlier ones
+        warped[dst_yx[:, 0], dst_yx[:, 1]] = img[src_yx[:, 0], src_yx[:, 1]]
+
+    t2 = time.time()
+    print("time: ", t2-t1)
 
     # # Generate grid of coordinates
     # grid_y, grid_x = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
