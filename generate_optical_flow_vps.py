@@ -38,6 +38,24 @@ def viz(img, flo):
     cv2.imshow('image', img_flo[:, :, [2,1,0]]/255.0)
     cv2.waitKey()
 
+def is_two_consecutive_images(img_file_1: str, img_file_2: str, for_all_img: bool=False):
+    
+    if for_all_img: #i.e.: munster_000152_000023_leftImg8bit.png
+
+        img_name_1    = img_file_1.split("/")[-1]
+        sequence_id_1 = img_name_1.split("_")[1]
+        img_seq_id_1  = img_name_1.split("_")[2]
+
+        img_name_2    = img_file_2.split("/")[-1]
+        sequence_id_2 = img_name_2.split("_")[1]
+        img_seq_id_2  = img_name_2.split("_")[2]
+
+        return (sequence_id_1 == sequence_id_2) and (abs(int(img_seq_id_1) - int(img_seq_id_2)) == 1)
+    else:
+        sequence_id_1 = img_file_1.split("/")[-1].split("_")[0]
+        sequence_id_2 = img_file_2.split("/")[-1].split("_")[0]
+
+        return sequence_id_1 == sequence_id_2
 
 def demo(args):
     model = torch.nn.DataParallel(RAFT(args))
@@ -56,10 +74,9 @@ def demo(args):
         
         images = sorted(images)
         for imfile1, imfile2 in zip(images[:-1], images[1:]):
-            sequence_id_1 = imfile1.split("/")[-1].split("_")[0]
-            sequence_id_2 = imfile2.split("/")[-1].split("_")[0]
-
-            if sequence_id_1 != sequence_id_2: continue
+            
+            if not is_two_consecutive_images(img_file_1=imfile1, img_file_2=imfile2, for_all_img=args.for_all_img):
+                continue
 
             image1 = load_image(imfile1)
             image2 = load_image(imfile2)
@@ -78,6 +95,9 @@ if __name__ == '__main__':
     parser.add_argument('--model', help="restore checkpoint")
     parser.add_argument('--path', help="dataset for evaluation")
     parser.add_argument('--output_path', help="path to save optical flow result")
+    parser.add_argument('--for_all_img', action='store_true', help='Specify this code is running for img_all/ with the acquisition rate is 30 Hz\
+                                                                    in Cityscapes-VPS.')
+
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
